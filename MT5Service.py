@@ -320,6 +320,22 @@ class MT5Service:
 
         return accounts
 
+    def search_accounts_by_name_email(self, name=None, email=None):
+        """Search accounts by name or email. Returns list of matching accounts."""
+        accounts = self.list_accounts_by_groups()
+        if not accounts:
+            return []
+
+        results = []
+        for acc in accounts:
+            acc_name = acc.get('name', '').lower()
+            acc_email = acc.get('email', '').lower()
+            if name and name.lower() in acc_name:
+                results.append(acc)
+            elif email and email.lower() in acc_email:
+                results.append(acc)
+        return results
+
 
 if __name__ == '__main__':
     import argparse
