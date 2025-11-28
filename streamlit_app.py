@@ -11,6 +11,13 @@ from profile import profile_view
 from filter_search import filter_search_view      # ⭐ NEW IMPORT
 from openposition import positions_details_view   # ⭐ NEW IMPORT
     
+
+# Cache a single MT5Service instance per Streamlit session/process to avoid
+# recreating the manager and reconnecting on every rerun/tab-change.
+@st.cache_resource
+def get_mt5_service():
+    return MT5Service()
+
 # Custom CSS for attractive navigation bar
 nav_css = """
 <style>
@@ -230,72 +237,7 @@ def reports_view(data):
     data.to_csv(buf, index=False)
     st.download_button('Download CSV', data=buf.getvalue(), file_name='accounts.csv', mime='text/csv')
 
-def positions_view(data):
-    st.subheader('All Open Positions')
-    svc = MT5Service()
-    all_positions = []
-    total_logins = len(data['login'].unique())
-    st.write(f"Checking {total_logins} accounts for open positions...")
-    for login in data['login'].unique():
-        try:
-            positions = svc.get_open_positions(login)
-            for p in positions:
-                # Map the keys to match the display columns
-                position_data = {
-                    'Login': login,
-                    'ID': p.get('id'),
-                    'Symbol': p.get('symbol'),
-                    'Vol': p.get('volume'),
-                    'Price': p.get('price'),
-                    'P/L': p.get('profit'),
-                    'Type': p.get('type'),
-                    'Date': p.get('date')
-                }
-                # Add account details
-                account_row = data[data['login'] == login]
-                if not account_row.empty:
-                    position_data['Name'] = account_row['name'].iloc[0] if 'name' in account_row.columns else ''
-                    position_data['Email'] = account_row['email'].iloc[0] if 'email' in account_row.columns else ''
-                    position_data['Group'] = account_row['group'].iloc[0] if 'group' in account_row.columns else ''
-                all_positions.append(position_data)
-        except Exception as e:
-            st.write(f"Error fetching positions for login {login}: {e}")
-            continue
-    st.write(f"Total positions found: {len(all_positions)}")
-    if all_positions:
-        df = pd.DataFrame(all_positions)
-        # Select only the desired columns: Login, ID, Symbol, Vol, Price, P/L, Type, Date, Name, Group
-        desired_columns = ['Login', 'ID', 'Symbol', 'Vol', 'Price', 'P/L', 'Type', 'Date', 'Name', 'Group']
-        available_columns = [col for col in desired_columns if col in df.columns]
-        if available_columns:
-            df_display = df[available_columns]
-        else:
-            df_display = df
 
-        # Pagination: 10 rows per page
-        rows_per_page = 10
-        total_rows = len(df_display)
-        total_pages = (total_rows // rows_per_page) + (1 if total_rows % rows_per_page > 0 else 0)
-
-        if 'positions_page' not in st.session_state:
-            st.session_state.positions_page = 1
-
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col1:
-            if st.button('Previous', key='prev_page') and st.session_state.positions_page > 1:
-                st.session_state.positions_page -= 1
-        with col2:
-            page = st.selectbox('Page', options=list(range(1, total_pages + 1)), index=st.session_state.positions_page - 1, key='page_select')
-            st.session_state.positions_page = page
-        with col3:
-            if st.button('Next', key='next_page') and st.session_state.positions_page < total_pages:
-                st.session_state.positions_page += 1
-
-        start_row = (st.session_state.positions_page - 1) * rows_per_page
-        end_row = start_row + rows_per_page
-        st.dataframe(df_display.iloc[start_row:end_row])
-    else:
-        st.info('No open positions found.')
 
 
 
@@ -361,10 +303,20 @@ def groups_view(data):
     else:
         st.info('No group data available.')
 
-@st.cache_data(ttl=5)
+# Global persistent MT5Service instance
+_mt5_service_instance = None
+
+def get_mt5_service():
+    """Get persistent MT5Service instance."""
+    global _mt5_service_instance
+    if _mt5_service_instance is None:
+        _mt5_service_instance = MT5Service()
+    return _mt5_service_instance
+
+@st.cache_data(ttl=60)
 def load_from_mt5(use_groups=True):
-    """Fetch accounts from MT5 using MT5Service. Cached for 5 seconds by default."""
-    svc = MT5Service()
+    """Fetch accounts from MT5 using persistent MT5Service. Cached for 5 seconds by default."""
+    svc = get_mt5_service()
     if use_groups:
         accounts = svc.list_accounts_by_groups()
     else:
@@ -401,8 +353,7 @@ def main():
         st.session_state.page = "profile"
     if st.sidebar.button("📊 Reports", key="nav_reports"):
         st.session_state.page = "reports"
-    if st.sidebar.button("📈 Open Positions", key="nav_positions"):
-        st.session_state.page = "positions"
+
     if st.sidebar.button("📊 Positions Details", key="nav_positions_details"):
         st.session_state.page = "positions_details"
     if st.sidebar.button("💰 P/L", key="nav_pl"):
@@ -424,8 +375,21 @@ def main():
 
     try:
         if refresh:
-            # clear cache and re-fetch
-            load_from_mt5.clear()
+                                # clear caches and re-fetch. Close existing manager before clearing
+            try:
+                svc = get_mt5_service()
+                svc.close()
+            except Exception:
+                pass
+            # clear cached resource and data so next call will recreate/refresh
+            try:
+                get_mt5_service.clear()
+            except Exception:
+                pass
+            try:
+                load_from_mt5.clear()
+            except Exception:
+                pass
         with st.spinner('Loading accounts from MT5...'):
             data = load_from_mt5(use_groups)
     except Exception as e:
@@ -477,8 +441,7 @@ def main():
         profile_view()
     elif st.session_state.page == 'reports':
         reports_view(data)
-    elif st.session_state.page == 'positions':
-        positions_view(data)
+
     elif st.session_state.page == 'positions_details':
         positions_details_view(data)
     elif st.session_state.page == 'pl':
