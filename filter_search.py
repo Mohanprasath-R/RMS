@@ -69,6 +69,7 @@ def filter_search_view(data):
 
     # ---------------- APPLY FILTERS ---------------
     filtered_df = df.copy()
+    
     if login_filter != "All":
         filtered_df = filtered_df[ filtered_df['login'] == login_filter ]
 
