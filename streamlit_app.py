@@ -8,6 +8,7 @@ import time
 from MT5Service import MT5Service
 from accounts import accounts_view
 from profile import profile_view
+from filter_search import filter_search_view      # ⭐ NEW IMPORT
     
 # Custom CSS for attractive navigation bar
 nav_css = """
@@ -47,7 +48,7 @@ nav_css = """
 def render_nav():
     st.markdown(nav_css, unsafe_allow_html=True)
     st.markdown('<div class="nav-container">', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3,col4 = st.columns(4)
     with col1:
         if st.button("🏠 Dashboard", key="nav_dashboard"):
             st.session_state.page = "dashboard"
@@ -57,6 +58,9 @@ def render_nav():
     with col3:
         if st.button("📊 Reports", key="nav_reports"):
             st.session_state.page = "reports"
+    with col4:
+        if st.button("🔍 Filter Search", key="nav_filter_search_top"):   # ⭐ NEW BUTTON
+            st.session_state.page = "filter_search"
     st.markdown('</div>', unsafe_allow_html=True)
 
 def dashboard_view(data):
@@ -356,6 +360,9 @@ def main():
         st.session_state.page = "positions"
     if st.sidebar.button("💰 P/L", key="nav_pl"):
         st.session_state.page = "pl"
+    if st.sidebar.button("🔍 Filter Search"):   # ⭐ NEW SIDEBAR BUTTON
+        st.session_state.page = "filter_search"
+
 
     st.sidebar.header('Data source')
     st.sidebar.write('Loading accounts directly from MT5 Manager using `.env` credentials')
@@ -422,6 +429,8 @@ def main():
         positions_view(data)
     elif st.session_state.page == 'pl':
         pl_view(data)
+    elif st.session_state.page == 'filter_search':   # ⭐ NEW PAGE
+        filter_search_view(data)
 
 
 if __name__ == '__main__':
