@@ -46,6 +46,10 @@ def accounts_view(data):
     if 'equity' in data.columns:
         top_eq = data.sort_values('equity', ascending=False).head(10)[['login', 'name', 'group', 'equity']]
         st.table(top_eq)
+        
+    st.subheader('Lowest Balance')    
     if 'balance' in data.columns:
         worst_bal = data.sort_values('balance', ascending=True).head(10)[['login', 'name', 'group', 'balance']]
         st.table(worst_bal)
+        
+        

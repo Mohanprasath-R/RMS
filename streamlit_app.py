@@ -48,7 +48,7 @@ nav_css = """
 def render_nav():
     st.markdown(nav_css, unsafe_allow_html=True)
     st.markdown('<div class="nav-container">', unsafe_allow_html=True)
-    col1, col2, col3,col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         if st.button("🏠 Dashboard", key="nav_dashboard"):
             st.session_state.page = "dashboard"
@@ -61,6 +61,9 @@ def render_nav():
     with col4:
         if st.button("🔍 Filter Search", key="nav_filter_search_top"):   # ⭐ NEW BUTTON
             st.session_state.page = "filter_search"
+    with col5:
+        if st.button("👥 Groups", key="nav_groups_top"):
+            st.session_state.page = "groups"
     st.markdown('</div>', unsafe_allow_html=True)
 
 def dashboard_view(data):
@@ -316,6 +319,31 @@ def pl_view(data):
     else:
         st.info('No profit/loss data available.')
 
+def groups_view(data):
+    st.subheader('Groups Overview')
+
+    if 'group' in data.columns:
+        # Get unique groups
+        groups_list = sorted(data['group'].dropna().unique().tolist())
+
+        if groups_list:
+            # Select group
+            selected_group = st.selectbox('Select a group to view its data', groups_list, key='selected_group')
+
+            # Filter data by selected group
+            filtered_data = data[data['group'] == selected_group]
+
+            # Display group summary
+            st.write(f"**Group:** {selected_group}")
+            st.write(f"**Total Accounts:** {len(filtered_data)}")
+
+            # Display filtered dataframe
+            st.dataframe(filtered_data)
+        else:
+            st.info('No groups available.')
+    else:
+        st.info('No group data available.')
+
 @st.cache_data(ttl=5)
 def load_from_mt5(use_groups=True):
     """Fetch accounts from MT5 using MT5Service. Cached for 5 seconds by default."""
@@ -323,8 +351,8 @@ def load_from_mt5(use_groups=True):
     if use_groups:
         accounts = svc.list_accounts_by_groups()
     else:
-        # Fallback to index-based if desired
-        accounts = svc.list_accounts_by_index()
+        # Fallback to range-based scan for more complete enumeration
+        accounts = svc.list_accounts_by_range(start=1, end=100000)
     if not accounts:
         return pd.DataFrame()
     return pd.json_normalize(accounts)
@@ -362,6 +390,8 @@ def main():
         st.session_state.page = "pl"
     if st.sidebar.button("🔍 Filter Search"):   # ⭐ NEW SIDEBAR BUTTON
         st.session_state.page = "filter_search"
+    if st.sidebar.button("👥 Groups", key="nav_groups"):
+        st.session_state.page = "groups"
 
 
     st.sidebar.header('Data source')
@@ -386,6 +416,9 @@ def main():
     if data.empty:
         st.info('No account data available.')
         return
+
+    # Debug: Show total accounts loaded
+    st.sidebar.write(f"Total accounts loaded: {len(data)}")
 
     # Normalize columns and types
     if 'login' in data.columns:
@@ -431,6 +464,8 @@ def main():
         pl_view(data)
     elif st.session_state.page == 'filter_search':   # ⭐ NEW PAGE
         filter_search_view(data)
+    elif st.session_state.page == 'groups':
+        groups_view(data)
 
 
 if __name__ == '__main__':

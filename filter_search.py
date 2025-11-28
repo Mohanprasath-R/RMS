@@ -70,13 +70,4 @@ def filter_search_view(data):
     st.write(f"**{len(df)} accounts found**")
     st.dataframe(df.head(500), use_container_width=True)
 
-    # ---------------- TOP ACCOUNTS ----------------
-    st.subheader(f"Top {account_type}s by Equity")
-    if 'equity' in df.columns:
-        top_eq = df.sort_values('equity', ascending=False).head(10)[['login', 'name', 'group', 'equity']]
-        st.table(top_eq)
 
-    st.subheader(f"Lowest Balance {account_type}s")
-    if 'balance' in df.columns:
-        low_bal = df.sort_values('balance', ascending=True).head(10)[['login', 'name', 'group', 'balance']]
-        st.table(low_bal)
