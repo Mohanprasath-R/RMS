@@ -32,7 +32,6 @@ def filter_search_view(data):
         f"**Total Real Accounts:** {total_real} &nbsp; | &nbsp; "
         f"**Total Demo Accounts:** {total_demo}"
     )
-
     # ---------------- ACCOUNT TYPE RADIO ----------------
     account_type = st.radio(
         "Select Account Type",
@@ -42,12 +41,13 @@ def filter_search_view(data):
 
     df = data.copy()
 
-    # ---------------- FILTER ACCOUNT TYPE (FIXED BUG) ----------------
+    # ---------------- FILTER ACCOUNT TYPE ----------------
     if 'group' in df.columns:
         if account_type == "Real Account":
             df = df[df["group"].apply(is_real)]
         else:
             df = df[df["group"].apply(is_demo)]
+
     # ---------------- SEARCH FILTERS ----------------
     col1, col2, col3 = st.columns([1, 1, 1])
 
@@ -63,33 +63,38 @@ def filter_search_view(data):
         group_options = ["All"] + sorted(df['group'].dropna().unique().tolist())
         base_filter = st.selectbox("Filter by Base Symbol", group_options)
 
-    # ---------------- APPLY FILTERS ---------------
+    # ---------------- START FILTER LOGIC ---------------
     filtered_df = df.copy()
 
+    # ---- Filter 1: Login filter ----
     if login_filter != "All":
-        filtered_df = filtered_df[ filtered_df['login'] == login_filter ]
+        filtered_df = filtered_df[filtered_df['login'] == login_filter]
 
+    # ---- Filter 2: Name filter ----
     if name_filter != "All":
-        filtered_df = filtered_df[ filtered_df['name'] == name_filter ]
+        filtered_df = filtered_df[filtered_df['name'] == name_filter]
 
+    # ---- Filter 3: Group/Base filter ----
     if base_filter != "All":
-        filtered_df = filtered_df[ filtered_df['group'] == base_filter ]
+        filtered_df = filtered_df[filtered_df['group'] == base_filter]
 
-    # ---------------- APPLY SIDEBAR FILTERS ----------------
+    # ---- APPLY SIDEBAR FILTERS ----
     if st.session_state.get("group_filter"):
-        filtered_df = filtered_df[ filtered_df['group'].isin(st.session_state.group_filter) ]
+        filtered_df = filtered_df[filtered_df['group'].isin(st.session_state.group_filter)]
 
     if st.session_state.get("name_filter"):
-        filtered_df = filtered_df[ filtered_df['name'].isin(st.session_state.name_filter) ]
+        filtered_df = filtered_df[filtered_df['name'].isin(st.session_state.name_filter)]
 
     if st.session_state.get("email_filter"):
-        filtered_df = filtered_df[ filtered_df['email'].isin(st.session_state.email_filter) ]
+        filtered_df = filtered_df[filtered_df['email'].isin(st.session_state.email_filter)]
 
     if st.session_state.get("leverage_filter"):
-        filtered_df = filtered_df[ filtered_df['leverage'].isin(st.session_state.leverage_filter) ]
+        filtered_df = filtered_df[filtered_df['leverage'].isin(st.session_state.leverage_filter)]
 
     if st.session_state.get("login_search"):
-        filtered_df = filtered_df[ filtered_df['login'].astype(str).str.contains(st.session_state.login_search) ]
+        filtered_df = filtered_df[
+            filtered_df['login'].astype(str).str.contains(st.session_state.login_search)
+        ]
 
     if 'balance' in filtered_df.columns:
         min_bal = st.session_state.get('min_balance', float(filtered_df['balance'].min()))
@@ -105,13 +110,9 @@ def filter_search_view(data):
 
     st.dataframe(filtered_df, use_container_width=True)
 
-    # ---------------- DISPLAY FULL REAL ACCOUNT LIST ----------------
-    st.subheader(f"{account_type} Matching Filters")
-
-    st.write(f"**{len(df)} accounts found**")
 
     # ⭐ SHOW FULL TABLE (not sliced to 500 rows)
-    st.dataframe(df, use_container_width=True)
+    #st.dataframe(df, use_container_width=True)
 
 # ------------------------------------------------------------
 # DEMO ACCOUNTS VIEW
