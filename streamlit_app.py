@@ -276,12 +276,28 @@ def positions_view(data):
     # Use cached data from background scanner
     global positions_cache
 
-    # Manual scan trigger
-    col1, col2 = st.columns([1, 4])
+    # Control buttons
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
     with col1:
         if st.button('🔄 Manual Scan', key='manual_scan'):
             st.session_state.manual_scan_trigger = True
             st.rerun()
+    with col2:
+        if st.button('▶️ Start Scanning', key='start_scanning'):
+            positions_cache['scanning'] = True
+            positions_cache['timestamp'] = 0  # Reset timestamp to force immediate scan
+            st.success("Background scanning started. Will begin scanning all accounts.")
+            st.rerun()
+    with col3:
+        if st.button('⏹️ Stop Scanning', key='stop_scanning'):
+            positions_cache['scanning'] = False
+            st.success("Background scanning stopped. Showing current data.")
+            st.rerun()
+    with col4:
+        if positions_cache['scanning']:
+            st.info("🔄 Background scanning is active")
+        else:
+            st.info("⏹️ Background scanning is stopped")
 
     # Show scanning status
     st.write(f"Debug scanning status: scanning={positions_cache['scanning']}, progress={positions_cache.get('progress', {})}")
@@ -452,11 +468,15 @@ def pl_view(data):
     st.subheader('Profit/Loss Overview')
 
     # Account type buttons
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
+        if st.button("All Accounts", key="all_pl"):
+            if 'pl_account_type' in st.session_state:
+                del st.session_state.pl_account_type
+    with col2:
         if st.button("Demo Account", key="demo_pl"):
             st.session_state.pl_account_type = "demo"
-    with col2:
+    with col3:
         if st.button("Real Account", key="real_pl"):
             st.session_state.pl_account_type = "real"
 
@@ -470,18 +490,16 @@ def pl_view(data):
             data = data[~data['group'].str.contains('demo', case=False, na=False)]
 
     if 'profit' in data.columns:
-        # Create separate Profit and Loss columns
-        data_copy = data.copy()
-        data_copy['Profit'] = data_copy['profit'].apply(lambda x: x if x > 0 else 0)
-        data_copy['Loss'] = data_copy['profit'].apply(lambda x: x if x < 0 else 0)
+        # Debug: Show profit statistics
+        st.write(f"Debug: Total accounts: {len(data)}, Min profit: {data['profit'].min()}, Max profit: {data['profit'].max()}, Negative profits: {(data['profit'] < 0).sum()}")
 
         # Sort by profit descending
-        pl_data = data_copy.sort_values('profit', ascending=False)[['login', 'name', 'group', 'Profit', 'balance', 'equity']]
-        st.dataframe(pl_data.head(50))
+        pl_data = data.sort_values('profit', ascending=False)[['login', 'name', 'group', 'profit', 'balance', 'equity']]
+        st.dataframe(pl_data)
 
         # P/L distribution chart
         st.subheader('P/L Distribution')
-        st.bar_chart(data['profit'].head(50))
+        st.bar_chart(data['profit'])
     else:
         st.info('No profit/loss data available.')
 
@@ -516,9 +534,9 @@ def background_position_scanner():
     print("Background position scanner thread started!")
     while True:
         try:
-            # Check if we need to scan (every 30 seconds)
             current_time = time.time()
-            if current_time - positions_cache['timestamp'] > 30:
+            # Check if we need to scan (either manually triggered or every 30 seconds)
+            if positions_cache['scanning'] or (current_time - positions_cache['timestamp'] > 30):
                 positions_cache['scanning'] = True
                 print(f"Starting background position scan at {time.strftime('%H:%M:%S')}")
 
@@ -591,8 +609,8 @@ def background_position_scanner():
             print(f"Error in background position scanner: {e}")
             positions_cache['scanning'] = False
 
-        # Sleep for 10 seconds before next check
-        time.sleep(10)
+        # Sleep for 1 second for better responsiveness
+        time.sleep(1)
 
 def matrix_lot_view(data):
     st.subheader('Login vs Symbol Matrix - Net Lot')
@@ -677,7 +695,7 @@ def usd_matrix_view(data):
                 total_pnl = matrix_df.loc["All Login"].sum() if "All Login" in matrix_df.index else matrix_df.sum().sum()
                 st.metric("Total USD P&L (All Login)", f"${total_pnl:,.2f}")
             
-            st.dataframe(matrix_df, use_container_width=True, height=500)
+            st.dataframe(matrix_df, width='stretch', height=500)
 
             # Export to CSV
             buf = io.StringIO()
@@ -709,7 +727,7 @@ def main():
 
     st.set_page_config(page_title='RMS - Accounts', layout='wide')
     st.title('RMS — Accounts Dashboard (Streamlit)')
-
+    
     # Auto refresh removed
 
     # Initialize session state for page
